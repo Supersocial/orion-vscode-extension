@@ -12,6 +12,58 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "orion.getGitHubUser",
+        "title": "Sign in with GitHub",
+        "category": "Orion"
+      },
+      {
+        "command": "orion.viewGitHubFileContent",
+        "title": "View GitHub File Content"
+      },
+      {
+        "command": "orion.npmInstallDependency",
+        "title": "Install"
+      },
+      {
+        "command": "orion.npmUpdateDependency",
+        "title": "Update"
+      },
+      {
+        "command": "orion.npmUninstallDependency",
+        "title": "Uninstall"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "orion.npmInstallDependency",
+          "when": "view == npmDependenciesView",
+          "group": "orion@0"
+        },
+        {
+          "command": "orion.npmUpdateDependency",
+          "when": "view == npmDependenciesView",
+          "group": "orion@0"
+        },
+        {
+          "command": "orion.npmUninstallDependency",
+          "when": "view == npmDependenciesView",
+          "group": "orion@0"
+        },
+        {
+          "command": "orion.npmInstallDependency",
+          "when": "view == availablePackagesView && viewItem == dependencyNotInstalled",
+          "group": "inline"
+        },
+        {
+          "command": "orion.npmUninstallDependency",
+          "when": "view == availablePackagesView && viewItem == dependencyInstalled",
+          "group": "inline"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -24,12 +76,12 @@
     "views": {
       "orion-explorer": [
         {
-          "id": "package-dependencies",
-          "name": "Dependencies"
+          "id": "npmDependenciesView",
+          "name": "Installed Packages"
         },
         {
-          "id": "package-outline",
-          "name": "Outline"
+          "id": "availablePackagesView",
+          "name": "Available Packages"
         }
       ]
     }
@@ -46,6 +98,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
+    "@types/open": "^6.2.1",
     "@types/vscode": "^1.86.0",
     "@typescript-eslint/eslint-plugin": "^6.19.1",
     "@typescript-eslint/parser": "^6.19.1",
@@ -56,6 +109,10 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@vscode/webview-ui-toolkit": "^1.4.0"
+    "@octokit/rest": "^20.0.2",
+    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "axios": "^1.6.7",
+    "child-process": "^1.0.2",
+    "open": "^10.0.3"
   }
 }
