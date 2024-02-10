@@ -37,6 +37,21 @@
       {
         "command": "orion.npmUninstallDependency",
         "title": "Uninstall"
+      },
+      {
+        "command": "orion.addGitHubToken",
+        "title": "Add GitHub Token",
+        "category": "Orion"
+      },
+      {
+        "command": "orion.authNpm",
+        "title": "Authenticate NPM",
+        "category": "Orion"
+      },
+      {
+        "command": "orion.clearAllSecrets",
+        "title": "Clear all secrets",
+        "category": "Orion"
       }
     ],
     "menus": {
@@ -80,7 +95,7 @@
     "views": {
       "orion-explorer": [
         {
-          "id": "npmDependenciesView",
+          "id": "githubRepoView",
           "name": "Installed Packages"
         },
         {

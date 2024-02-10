@@ -17,6 +17,8 @@ class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
         }
     
         try {
+            console.log('Fetching GitHub repository contents:', apiPath);
+
             const response = await this.octokit.request(apiPath, {
                 headers: {
                     'X-GitHub-Api-Version': '2022-11-28'

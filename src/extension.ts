@@ -1,12 +1,17 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import * as url from 'url';
 import { Credentials } from './credentials';
 import NpmDependenciesProvider from "./providers/NpmDependenciesProvider";
 import PackagesContentProvider from "./providers/PackagesContentProvider";
 import GitHubContentProvider from "./providers/GitHubContentProvider";
+import GitHubRepoContentProvider from './providers/GitHubRepoContentProvider';
 import * as childProcess from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+
+const secretKeys = ['githubAccessToken'];
 
 /*
 	Runs a command in the terminal and returns the output
@@ -39,6 +44,58 @@ async function runNpmCommand(command: string, cwd: string) {
 	}
 }
 
+/*
+	Stores the github auth token
+*/
+async function storeToken(context: vscode.ExtensionContext) {
+    const secretKey = 'githubAccessToken';
+    const token = await vscode.window.showInputBox({ prompt: 'Enter your access token' });
+
+    if (token) {
+        await context.secrets.store(secretKey, token);
+        vscode.window.showInformationMessage('Access token stored securely.');
+    }
+}
+
+/*
+	Retrieves the github auth token
+*/
+async function retrieveToken(context: vscode.ExtensionContext): Promise<string | undefined> {
+    const secretKey = 'githubAccessToken';
+    const token = await context.secrets.get(secretKey);
+
+    return token;
+}
+
+/*
+	Clears all secrets
+*/
+async function clearAllSecrets(context: vscode.ExtensionContext) {
+    for (const key of secretKeys) {
+        await context.secrets.delete(key);
+    }
+    vscode.window.showInformationMessage('All secrets have been cleared.');
+}
+
+/*
+	Auths npm
+*/
+async function configureNpmrc(token: string): Promise<void> {
+    const npmrcPath = path.join(os.homedir(), '.npmrc');
+    const scope = '@supersocial';
+    const registry = 'https://npm.pkg.github.com';
+    const authLine = `${scope}:registry=${registry}\n//npm.pkg.github.com/:_authToken=${token}\n`;
+
+    fs.appendFile(npmrcPath, authLine, (err) => {
+        if (err) {
+            vscode.window.showErrorMessage('Failed to configure npm.');
+            console.error(err);
+            return;
+        }
+        vscode.window.showInformationMessage('npm configured successfully.');
+    });
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
@@ -54,9 +111,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const githubContentProvider = new GitHubContentProvider();
 
 	// register
-    vscode.window.registerTreeDataProvider('npmDependenciesView', npmDependenciesProvider);
+    // vscode.window.registerTreeDataProvider('npmDependenciesView', npmDependenciesProvider);
     vscode.window.registerTreeDataProvider('availablePackagesView', packageContentProvider);
-
+	vscode.window.registerTreeDataProvider('githubRepoView', new GitHubRepoContentProvider(octokit));
+	
 	context.subscriptions.push(vscode.commands.registerCommand('orion.npmUpdateDependency', (item: vscode.TreeItem) => {
 		vscode.window.showInformationMessage(`Updating ${item.label}...`);
 	}));
@@ -90,7 +148,8 @@ export async function activate(context: vscode.ExtensionContext) {
 			vscode.window.showErrorMessage(`Failed to uninstall ${packageName}: ${error}`);
 		});
     });
-	
+
+	// github file viewing
 	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('github', githubContentProvider));
 	context.subscriptions.push(vscode.commands.registerCommand('orion.viewGitHubFileContent', async (downloadUrl) => {
 		// Parse the URL to get the pathname, then extract the filename
@@ -104,29 +163,43 @@ export async function activate(context: vscode.ExtensionContext) {
 			path: filename,
 			query: encodeURIComponent(downloadUrl)
 		});
+
 		const doc = await vscode.workspace.openTextDocument(uri); // Request VS Code to open the virtual document
 		await vscode.window.showTextDocument(doc, { preview: true });
 	}));	
 
-	const response = await octokit.packages.getAllPackageVersionsForPackageOwnedByOrg({
-		package_type: 'npm',
-		package_name: 'baseobject',
-		org: 'Supersocial'
+	// github token / NPM
+	context.subscriptions.push(vscode.commands.registerCommand('orion.clearAllSecrets', () => clearAllSecrets(context)));
+	context.subscriptions.push(vscode.commands.registerCommand('orion.addGitHubToken', async () => {
+		await storeToken(context);
+		vscode.commands.executeCommand('orion.authNpm');
+	}));
+
+	// handles requests to re-auth NPM
+	context.subscriptions.push(vscode.commands.registerCommand('orion.authNpm', () => {
+		retrieveToken(context).then(async (token) => {
+			if (!token) {
+				return;
+			}
+
+			// if the token exists we can auth npm
+			vscode.window.showInformationMessage('Authenticating NPM...');
+
+			// configure npm
+			configureNpmrc(token).then(() => {
+				vscode.window.showInformationMessage(`Successfully authenticated NPM`);
+			}).catch((error) => {
+				vscode.window.showErrorMessage(`Failed to authenticate NPM ${error}`);
+			});
+		});
+	}));
+
+	// warn if no token
+	retrieveToken(context).then((token) => {
+		if (!token) {
+			vscode.window.showInformationMessage('No GitHub token found. Please add one to use Orion');
+		}
 	});
-
-	console.log(response);
-
-	// // handle github auth
-	// const userInfo = await octokit.users.getAuthenticated();
-	// vscode.window.showInformationMessage(`Hello ${userInfo.data.login}!`);
-
-	// const response = await octokit.request('/repos/Supersocial/Orion/contents', {
-	// 	headers: {
-	// 		'X-GitHub-Api-Version': '2022-11-28'
-	// 	}
-	// })
-
-	// console.log(response.data);
 }
 
 // This method is called when your extension is deactivated

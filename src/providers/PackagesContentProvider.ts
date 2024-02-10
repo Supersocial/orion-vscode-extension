@@ -35,7 +35,7 @@ class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
             // fetch a list of packages in this repository
             const packageJsonPath = path.join(this.workspaceRoot, 'package.json');
             const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            console.log(packageJson);
+            // console.log(packageJson);
     
             return Promise.all(response.data
                 .sort((a: any, b: any) => a.name.localeCompare(b.name)) // Sort items alphabetically by name
