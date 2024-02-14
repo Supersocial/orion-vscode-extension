@@ -2,7 +2,7 @@
   "name": "orionpackagemanager",
   "displayName": "OrionPackageManager",
   "description": "Manage Orion packages and dependencies",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "supersocial",
   "icon": "resources/extension-icon.png",
   "engines": {
