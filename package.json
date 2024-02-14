@@ -172,13 +172,17 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
     "compile": "node ./esbuild.js",
     "watch": "node ./esbuild.js --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "vscode-test",
-    "package": "NODE_ENV=production node ./esbuild.js"
+    "package": "NODE_ENV=production node ./esbuild.js",
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "test-compile": "tsc -p ./"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
