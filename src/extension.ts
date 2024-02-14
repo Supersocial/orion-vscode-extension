@@ -2,15 +2,15 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { Credentials } from './credentials';
-import NpmDependenciesProvider from "./providers/NpmDependenciesProvider";
-import PackagesContentProvider from "./providers/PackagesContentProvider";
 import GitHubContentProvider from "./providers/GitHubContentProvider";
 import GitHubRepoContentProvider from './providers/GitHubRepoContentProvider';
+import OrionPackagesProvider from './providers/OrionPackagesProvider';
+import NodeDependenciesProvider from './providers/NodeDependenciesProvider';
 import * as childProcess from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-
+import { initResources } from './icons';
 const secretKeys = ['githubAccessToken'];
 
 /*
@@ -96,30 +96,74 @@ async function configureNpmrc(token: string): Promise<void> {
     });
 }
 
+/*
+	Fetches all packages from the org
+*/
+async function fetchAllPackages(octokit: any): Promise<any[]> {
+	const response = await octokit.packages.listPackagesForOrganization({
+		package_type: 'npm',
+		org: 'Supersocial',
+		per_page: 100
+	});
+
+	return response.data;
+}
+
+/*
+	Gets the current repo's dependencies
+*/
+function getCurrentRepoDependencies(workspaceRoot: string): any[] {
+	const packageJsonPath = path.join(workspaceRoot, 'package.json');
+	const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+	const deps = packageJson.dependencies
+		? Object.keys(packageJson.dependencies).map((dep) => {
+			const currentVersion = packageJson.dependencies[dep];
+			return { dep, currentVersion };
+		})
+		: [];
+
+	return deps;
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
 	const credentials = new Credentials();
 	await credentials.initialize(context);
 
+	initResources(context);
+
 	const octokit = await credentials.getOctokit();
 	const workspaceRoot = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0 ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined) as string;
 	
 	// content providers
-	const npmDependenciesProvider = new NpmDependenciesProvider(workspaceRoot, octokit!);
-	const packageContentProvider = new PackagesContentProvider(workspaceRoot, octokit);
+	const npmDependenciesProvider = new NodeDependenciesProvider(workspaceRoot, octokit!);
+	const orionPackagesProvider  = new OrionPackagesProvider(workspaceRoot, octokit);
 	const githubContentProvider = new GitHubContentProvider();
 
-	// register
-    // vscode.window.registerTreeDataProvider('npmDependenciesView', npmDependenciesProvider);
-    vscode.window.registerTreeDataProvider('availablePackagesView', packageContentProvider);
-	vscode.window.registerTreeDataProvider('githubRepoView', new GitHubRepoContentProvider(octokit));
-	
-	context.subscriptions.push(vscode.commands.registerCommand('orion.npmUpdateDependency', (item: vscode.TreeItem) => {
+	const installedPackagesProvider = new NodeDependenciesProvider(workspaceRoot, octokit);	
+	const githubRepoContentProvider = new GitHubRepoContentProvider(octokit);
+
+	// orion
+    vscode.window.registerTreeDataProvider('orionPackagesView', orionPackagesProvider);
+	context.subscriptions.push(vscode.commands.registerCommand('orionPackages.refresh', () => orionPackagesProvider.refresh()));
+
+	// npm dependencies
+	vscode.window.registerTreeDataProvider('npmDependenciesView', npmDependenciesProvider);
+	context.subscriptions.push(vscode.commands.registerCommand('npmDependencies.refresh', () => npmDependenciesProvider.refresh()));
+
+	context.subscriptions.push(vscode.commands.registerCommand('npmDependencies.updateDependency', (item: vscode.TreeItem) => {
 		vscode.window.showInformationMessage(`Updating ${item.label}...`);
+
+		runNpmCommand(`npm install ${(item as any).fullName}@latest`, workspaceRoot).then((result) => {
+			npmDependenciesProvider.refresh();
+			vscode.window.showInformationMessage(`Updated ${item.label}`);
+		}).catch((error) => {
+			vscode.window.showErrorMessage(`Failed to update ${item.label}: ${error}`);
+		});
 	}));
 
-	vscode.commands.registerCommand('orion.npmInstallDependency', (node) => {
+	vscode.commands.registerCommand('npmDependencies.installDependency', (node) => {
         const packageName = node.label;
 		
 		// feedback
@@ -127,14 +171,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		// run the command
 		runNpmCommand(`npm install @supersocial/${packageName}`, workspaceRoot).then((result) => {
-			packageContentProvider.refresh();
+			orionPackagesProvider.refresh();
+			npmDependenciesProvider.refresh();
 			vscode.window.showInformationMessage(`Installed ${packageName}`);
 		}).catch((error) => {
 			vscode.window.showErrorMessage(`Failed to install ${packageName}: ${error}`);
 		});
     });
 
-	vscode.commands.registerCommand('orion.npmUninstallDependency', (node) => {
+	vscode.commands.registerCommand('npmDependencies.uninstallDependency', (node) => {
         const packageName = node.label;
 		
 		// feedback
@@ -142,7 +187,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
 		// run the command
 		runNpmCommand(`npm uninstall @supersocial/${packageName}`, workspaceRoot).then((result) => {
-			packageContentProvider.refresh();
+			npmDependenciesProvider.refresh();
+			orionPackagesProvider.refresh();
 			vscode.window.showInformationMessage(`Uninstalled ${packageName}`);
 		}).catch((error) => {
 			vscode.window.showErrorMessage(`Failed to uninstall ${packageName}: ${error}`);

@@ -1,8 +1,10 @@
 {
   "name": "orionpackagemanager",
   "displayName": "OrionPackageManager",
-  "description": "",
+  "description": "Manage Orion packages and dependencies",
   "version": "0.0.1",
+  "publisher": "supersocial",
+  "icon": "resources/extension-icon.png",
   "engines": {
     "vscode": "^1.86.0"
   },
@@ -27,18 +29,6 @@
         "title": "View GitHub File Content"
       },
       {
-        "command": "orion.npmInstallDependency",
-        "title": "Install"
-      },
-      {
-        "command": "orion.npmUpdateDependency",
-        "title": "Update"
-      },
-      {
-        "command": "orion.npmUninstallDependency",
-        "title": "Uninstall"
-      },
-      {
         "command": "orion.addGitHubToken",
         "title": "Add GitHub Token",
         "category": "Orion"
@@ -52,34 +42,89 @@
         "command": "orion.clearAllSecrets",
         "title": "Clear all secrets",
         "category": "Orion"
+      },
+      {
+        "command": "npmDependencies.installDependency",
+        "title": "Install",
+        "icon": {
+          "light": "resources/icons/light/add.svg",
+          "dark": "resources/icons/dark/add.svg"
+        }
+      },
+      {
+        "command": "npmDependencies.updateDependency",
+        "title": "Update",
+        "icon": {
+          "light": "resources/icons/light/refresh.svg",
+          "dark": "resources/icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "npmDependencies.uninstallDependency",
+        "title": "Uninstall",
+        "icon": {
+          "light": "resources/icons/light/remove.svg",
+          "dark": "resources/icons/dark/remove.svg"
+        }
+      },
+      {
+        "command": "npmDependencies.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/icons/light/refresh.svg",
+          "dark": "resources/icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "orionPackages.refresh",
+        "title": "Refresh",
+        "icon": {
+          "light": "resources/icons/light/refresh.svg",
+          "dark": "resources/icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "orionPackages.search",
+        "title": "Search",
+        "icon": {
+          "light": "resources/icons/light/explorer.svg",
+          "dark": "resources/icons/dark/explorer.svg"
+        }
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "npmDependencies.refresh",
+          "when": "view == npmDependenciesView",
+          "group": "navigation"
+        },
+        {
+          "command": "orionPackages.refresh",
+          "when": "view == orionPackagesView",
+          "group": "navigation"
+        },
+        {
+          "command": "orionPackages.search",
+          "when": "view == orionPackagesView",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
-          "command": "orion.npmInstallDependency",
+          "command": "npmDependencies.installDependency",
+          "when": "view == orionPackagesView",
+          "group": "inline@0"
+        },
+        {
+          "command": "npmDependencies.updateDependency",
+          "when": "view == npmDependenciesView && viewItem == outdated",
+          "group": "inline@0"
+        },
+        {
+          "command": "npmDependencies.uninstallDependency",
           "when": "view == npmDependenciesView",
-          "group": "orion@0"
-        },
-        {
-          "command": "orion.npmUpdateDependency",
-          "when": "view == npmDependenciesView",
-          "group": "orion@0"
-        },
-        {
-          "command": "orion.npmUninstallDependency",
-          "when": "view == npmDependenciesView",
-          "group": "orion@0"
-        },
-        {
-          "command": "orion.npmInstallDependency",
-          "when": "view == availablePackagesView && viewItem == dependencyNotInstalled",
-          "group": "inline"
-        },
-        {
-          "command": "orion.npmUninstallDependency",
-          "when": "view == availablePackagesView && viewItem == dependencyInstalled",
-          "group": "inline"
+          "group": "inline@1"
         }
       ]
     },
@@ -96,14 +141,35 @@
       "orion-explorer": [
         {
           "id": "githubRepoView",
-          "name": "Installed Packages"
+          "name": "Orion Templates",
+          "icon": "resources/icons/light/explorer.svg"
         },
         {
-          "id": "availablePackagesView",
-          "name": "Available Packages"
+          "id": "npmDependenciesView",
+          "name": "Installed Packages",
+          "icon": "resources/icons/light/explorer.svg"
+        },
+        {
+          "id": "orionPackagesView",
+          "name": "Available Packages",
+          "icon": "resources/icons/light/add.svg"
         }
       ]
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "npmDependenciesView",
+        "contents": "No packages installed"
+      },
+      {
+        "view": "orionPackagesView",
+        "contents": "No packages available"
+      },
+      {
+        "view": "githubRepoView",
+        "contents": "No templates available"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -132,6 +198,8 @@
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "axios": "^1.6.7",
     "child-process": "^1.0.2",
-    "open": "^10.0.3"
+    "esbuild-plugin-copy": "^2.1.1",
+    "open": "^10.0.3",
+    "weather-js": "^2.0.0"
   }
 }

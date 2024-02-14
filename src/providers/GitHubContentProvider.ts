@@ -7,6 +7,7 @@ class GitHubContentProvider implements vscode.TextDocumentContentProvider {
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         const downloadUrl = decodeURIComponent(decodeURIComponent(uri.query));
+        console.log(downloadUrl);
 
         try {
             const response = await axios.get(downloadUrl, {
@@ -22,3 +23,6 @@ class GitHubContentProvider implements vscode.TextDocumentContentProvider {
 }
 
 export default GitHubContentProvider;
+
+//https://raw.githubusercontent.com/Supersocial/orion/main/tsconfig.json?token=ABK3UGH2DZQXIEV4RWLSBILFY4QVQ
+//https://raw.githubusercontent.com/Supersocial/orion/main/tsconfig.json?token=GHSAT0AAAAAACIIQA3FY55SD63X75FECD5WZOHF63A

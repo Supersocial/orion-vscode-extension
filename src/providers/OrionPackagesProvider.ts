@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { vsCodeBadge } from '@vscode/webview-ui-toolkit';
 
-class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
+class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<RepoItem | undefined | null> = new vscode.EventEmitter<RepoItem | undefined | null>();
     readonly onDidChangeTreeData: vscode.Event<RepoItem | undefined | null> = this._onDidChangeTreeData.event;
 
@@ -35,7 +34,6 @@ class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
             // fetch a list of packages in this repository
             const packageJsonPath = path.join(this.workspaceRoot, 'package.json');
             const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            // console.log(packageJson);
     
             return Promise.all(response.data
                 .sort((a: any, b: any) => a.name.localeCompare(b.name)) // Sort items alphabetically by name
@@ -46,34 +44,14 @@ class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
                     const properName = `@supersocial/${item.name}`;
                     const installed = packageJson.dependencies[properName] !== undefined;
 
-                    // fetch package versions
-                    const versions = await this.octokit.packages.getAllPackageVersionsForPackageOwnedByOrg({
-                        package_type: 'npm',
-                        org: 'Supersocial',
-                        package_name: item.name,
-                        per_page: 50
-                    });
-
-                    // fetch latest version
-                    let latestVersion;
-
-                    // find the first non canary version
-                    for (let i = 0; i < versions.data.length; i++) {
-                        const versionName = versions.data[i].name;
-
-                        if (!versionName.includes('canary')) {
-                            latestVersion = versionName;
-
-                            break;
-                        }
+                    if (installed) {
+                        return null;
                     }
 
                     return new RepoItem(
                         item.name,
                         item.type === 'dir' ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
                         itemPath, // Assuming itemPath holds the full GitHub path to the item
-                        installed,
-                        latestVersion,
                         item.type !== 'dir' ? {
                             command: 'orion.viewGitHubFileContent', // This command will be triggered when a file item is clicked
                             title: "View File",
@@ -94,22 +72,13 @@ class RepoItem extends vscode.TreeItem {
         public readonly label: string,
         public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly path: string,
-        public readonly installed: boolean,
-        public readonly newestVersion: string,
         public readonly command?: vscode.Command
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
         this.resourceUri = vscode.Uri.parse(path);
-        this.contextValue = installed ? 'dependencyInstalled' : 'dependencyNotInstalled';
-        this.description = newestVersion;
-
-        if (installed) {
-            this.iconPath = new vscode.ThemeIcon('notebook-state-success');
-        } else {
-            this.iconPath = new vscode.ThemeIcon('extensions-install-count');
-        }
+        this.iconPath = new vscode.ThemeIcon('package');
     }
 }
 
-export default GitHubRepoContentProvider;
+export default AvailablePackagesProvider;
