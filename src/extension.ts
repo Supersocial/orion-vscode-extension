@@ -53,7 +53,6 @@ async function storeToken(context: vscode.ExtensionContext) {
 
     if (token) {
         await context.secrets.store(secretKey, token);
-        vscode.window.showInformationMessage('Access token stored securely.');
     }
 }
 
@@ -89,40 +88,12 @@ async function configureNpmrc(token: string): Promise<void> {
     fs.appendFile(npmrcPath, authLine, (err) => {
         if (err) {
             vscode.window.showErrorMessage('Failed to configure npm.');
-            console.error(err);
+            
+			console.error(err);
+
             return;
         }
-        vscode.window.showInformationMessage('npm configured successfully.');
     });
-}
-
-/*
-	Fetches all packages from the org
-*/
-async function fetchAllPackages(octokit: any): Promise<any[]> {
-	const response = await octokit.packages.listPackagesForOrganization({
-		package_type: 'npm',
-		org: 'Supersocial',
-		per_page: 100
-	});
-
-	return response.data;
-}
-
-/*
-	Gets the current repo's dependencies
-*/
-function getCurrentRepoDependencies(workspaceRoot: string): any[] {
-	const packageJsonPath = path.join(workspaceRoot, 'package.json');
-	const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-	const deps = packageJson.dependencies
-		? Object.keys(packageJson.dependencies).map((dep) => {
-			const currentVersion = packageJson.dependencies[dep];
-			return { dep, currentVersion };
-		})
-		: [];
-
-	return deps;
 }
 
 // This method is called when your extension is activated
@@ -243,7 +214,7 @@ export async function activate(context: vscode.ExtensionContext) {
 	// warn if no token
 	retrieveToken(context).then((token) => {
 		if (!token) {
-			vscode.window.showInformationMessage('No GitHub token found. Please add one to use Orion');
+			vscode.window.showWarningMessage('No GitHub token found. Orion may not work as expected.');
 		}
 	});
 }

@@ -24,6 +24,22 @@ class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
             apiPath += `/${element.path}`;
         }
     
+        // validate that the user is in the org
+        try {
+            // get the current user
+            const user = await this.octokit.users.getAuthenticated();
+            
+            // check the users permissions in the org
+            await this.octokit.orgs.checkMembershipForUser({
+                org: 'Supersocial',
+                username: user.data.login
+            });
+        } catch (e) {
+            vscode.window.showErrorMessage('You are not in the Supersocial org. Please join the org to use this extension.');
+            
+            return [];
+        }
+
         try {
             const response = await this.octokit.packages.listPackagesForOrganization({
                 package_type: 'npm',
