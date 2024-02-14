@@ -1,5 +1,9 @@
 # Change Log
 
+## [0.3.0]
+### Changes
+- Updated the display name of the extension
+
 ## [0.2.0]
 
 ### Added

@@ -1,7 +1,7 @@
 {
   "name": "orionpackagemanager",
-  "displayName": "OrionPackageManager",
-  "description": "Manage Orion packages and dependencies",
+  "displayName": "Orion - Project Manager",
+  "description": "Manage Orion-based projects, packages and dependencies",
   "version": "0.2.0",
   "publisher": "supersocial",
   "icon": "resources/extension-icon.png",
