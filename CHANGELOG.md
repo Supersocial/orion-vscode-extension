@@ -1,9 +1,11 @@
 # Change Log
 
-All notable changes to the "orionpackagemanager" extension will be documented in this file.
+## [0.2.0]
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+### Added
+- Adds properly formatted CHANGELOG (woah that's meta)
 
-## [Unreleased]
+## [0.1.0]
 
-- Initial release
+### Added
+- New extension icon
