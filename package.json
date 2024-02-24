@@ -2,7 +2,7 @@
   "name": "orionoutpost",
   "displayName": "Orion - Outpost",
   "description": "Manage Orion-based projects, packages and dependencies",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "supersocial",
   "icon": "resources/extension-icon.png",
   "engines": {
@@ -135,7 +135,6 @@
           "group": "navigation@0"
         },
         {
-          
           "command": "orionPackages.refresh",
           "when": "view == orionPackagesView",
           "group": "navigation"
