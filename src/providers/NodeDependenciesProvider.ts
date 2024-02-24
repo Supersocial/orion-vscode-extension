@@ -2,6 +2,13 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { getAbsoluteIconPath } from '../icons';
+import {
+    getInstalledPackageVersion,
+    getPackageLockVersion,
+    isMajorBump,
+    isVersionNewer,
+    isVersionOlder
+} from '../utilities/npmUtils';
 
 class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<RepoItem | undefined | null> = new vscode.EventEmitter<RepoItem | undefined | null>();
@@ -13,11 +20,7 @@ class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
         this._onDidChangeTreeData.fire(undefined); // Passing undefined refreshes all elements
     }
 
-    async getTreeItem(element: RepoItem): Promise<vscode.TreeItem> {
-        return element;
-    }
-
-    async getChildren(): Promise<RepoItem[]> {
+    async getRepoDependencies(): Promise<RepoItem[]> {
         try {
             // fetch a list of packages in this repository
             const packageJsonPath = path.join(this.workspaceRoot, 'package.json');
@@ -26,9 +29,6 @@ class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
             let items = [];
             
             for (const name in packageJson.dependencies) {
-                // get the installed version without the caret
-                const installedVersion = packageJson.dependencies[name].replace('^', '');
-
                 // get the package name without the scope
                 const org = name.split('/')[0];
                 const packageName = name.split('/')[1];
@@ -38,49 +38,101 @@ class AvailablePackagesProvider implements vscode.TreeDataProvider<RepoItem> {
                     continue;
                 }
 
-                items.push(this.octokit.packages.getAllPackageVersionsForPackageOwnedByOrg({
-                    package_type: 'npm',
-                    org: "Supersocial",
-                    package_name: packageName,
-                    per_page: 50
-                }).then((versions: { data: string | any[]; }) => {
-                    // fetch latest version
-                    let latestVersion;
+                // get relevant versions
+                const nodeModulesVersion = await getInstalledPackageVersion(packageName, org, this.workspaceRoot);
+                const packageLockVersion = await getPackageLockVersion(packageName, org, this.workspaceRoot);
 
-                    // find the first non canary version
-                    for (let i = 0; i < versions.data.length; i++) {
-                        const versionName = versions.data[i].name;
-
-                        if (!versionName.includes('canary')) {
-                            latestVersion = versionName;
-
-                            break;
-                        }
-                    }
-
-                    // determine if the installed version is the latest
-                    return new RepoItem(
-                        packageName,
-                        name,
-                        installedVersion,
-                        latestVersion
-                    );
-                }).catch((error: any) => {
-                    console.error(`Failed to load dependency version for ${org}/${packageName}`, error);
-
-                    return [];
-                }));
-            }
-
-            return Promise.all(items).catch((error) => {
-                console.error('Failed to load repo dependencies', error);
-
-                return [];
-            });            
+                // create the item
+                items.push(new RepoItem(
+                    packageName,
+                    name,
+                    nodeModulesVersion,
+                    packageLockVersion
+                ));
+            }         
+            
+            return items;
         } catch (error) {
             console.error('Failed to load repo dependencies', error);
             vscode.window.showErrorMessage('Failed to load local packages. See console for details.');
+            
             return [];
+        }
+    };
+
+    async getTreeItem(element: RepoItem): Promise<vscode.TreeItem> {
+        return element;
+    };
+
+    async getChildren(element: RepoItem): Promise<RepoItem[]> {
+        let apiPath = '/repos/Supersocial/Orion/contents';
+        
+        if (element) {
+            try {
+                const versions = await this.octokit.packages.getAllPackageVersionsForPackageOwnedByOrg({
+                    package_type: 'npm',
+                    org: "Supersocial",
+                    package_name: element.name,
+                    per_page: 50
+                });
+
+                return versions.data
+                    .sort((a: any, b: any) => b.name.localeCompare(a.name))
+                    .map((version: { name: string; }) => {
+                    return new VersionItem(
+                        version.name,
+                        element.name,
+                        element.installedVersion,
+                        {
+                            command: 'orion.viewGitHubFileContent',
+                            title: "View File",
+                            arguments: [{
+                                type: 'fileByName',
+                                filePath: `${apiPath}/src/${element.name}/CHANGELOG.md`
+                            }]
+                        }
+                    );
+                });
+            } catch (error) {
+                console.error('Failed to load dependency versions', error);
+
+                vscode.window.showErrorMessage('Failed to load dependency versions. See console for details.');
+            };
+
+            return [];
+        } else {
+            return this.getRepoDependencies();
+        }
+    }
+}
+
+class VersionItem extends vscode.TreeItem {
+    constructor(
+        public readonly name: string,
+        public readonly packageName: string,
+        public readonly installedVersion: string | undefined,
+        public readonly command?: vscode.Command
+    ) {
+        super(name, vscode.TreeItemCollapsibleState.None);
+        this.installedVersion = installedVersion;
+        this.contextValue = 'version';
+
+        // display warning if new version is a major bump
+        if (isMajorBump(this.installedVersion as string, this.name)) {
+            this.tooltip = `Major version available: ${this.name}`;
+            this.iconPath = getAbsoluteIconPath("workflowruns/wr_warning.svg");
+        } else if (isVersionOlder(this.installedVersion as string, this.name)) {
+            this.tooltip = `Update available: ${this.name}`;
+            this.iconPath = new vscode.ThemeIcon("extensions-install-local-in-remote");
+        } else if (isVersionNewer(this.installedVersion as string, this.name)) {
+            this.tooltip = `Cannot downgrade: ${this.name} < ${this.installedVersion}`;
+            this.iconPath = getAbsoluteIconPath("workflowruns/wr_failure.svg");
+        } else if (this.installedVersion === this.name) {
+            this.tooltip = 'Installed';
+            this.iconPath = getAbsoluteIconPath("workflowruns/wr_success.svg");
+        } else {
+            this.tooltip = 'Equivalent version';
+            this.iconPath = getAbsoluteIconPath("workflowruns/wr_skipped.svg");
         }
     }
 }
@@ -89,19 +141,20 @@ class RepoItem extends vscode.TreeItem {
     constructor(
         public readonly name: string,
         public readonly fullName: string,
-        public readonly version: string,
-        public readonly latestVersion: string
+        public readonly installedVersion: string | undefined,
+        public readonly packageLockVersion: string | undefined
     ) {
-        super(name, vscode.TreeItemCollapsibleState.None);
-        this.version = version;
-        this.latestVersion = latestVersion;
+        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+
         this.fullName = fullName;
+        this.installedVersion = installedVersion;
+        this.packageLockVersion = packageLockVersion;
 
-        this.description = `v${this.version}`;
-        this.contextValue = (this.version === this.latestVersion) ? 'upToDate' : 'outdated';
+        this.description = `v${this.installedVersion}`;
+        this.contextValue = "installed_dependency";
 
-        if (this.contextValue === 'outdated') {
-            this.tooltip = `Outdated: ${this.version} < ${this.latestVersion}`;
+        if (this.installedVersion !== this.packageLockVersion) {
+            this.tooltip = `Outdated: ${this.installedVersion} < ${this.packageLockVersion}`;
             this.iconPath = getAbsoluteIconPath("workflowruns/wr_warning.svg");
         } else {
             this.tooltip = `Up to date`;

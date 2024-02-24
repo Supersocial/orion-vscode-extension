@@ -1,24 +1,28 @@
 import * as vscode from 'vscode';
 
 class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<RepoItem | undefined | null> = new vscode.EventEmitter<RepoItem | undefined | null>();
+    readonly onDidChangeTreeData: vscode.Event<RepoItem | undefined | null> = this._onDidChangeTreeData.event;
 
     constructor(private octokit: any) {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire(undefined); // Passing undefined refreshes all elements
+    }
 
     async getTreeItem(element: RepoItem): Promise<vscode.TreeItem> {
         return element;
     }
 
     async getChildren(element?: RepoItem): Promise<RepoItem[]> {
-        let apiPath = '/repos/Supersocial/Orion/contents';
-    
+        let apiPath = '/repos/Supersocial/Orion/contents/templates';
+
         if (element) {
-            // Use the path from the element for subdirectory contents
-            apiPath += `/${element.path}`;
+            // If an element is provided, fetch its children by appending the element's path
+            apiPath = `/repos/Supersocial/Orion/contents/${element.path}`;
         }
     
         try {
-            console.log('Fetching GitHub repository contents:', apiPath);
-
             const response = await this.octokit.request(apiPath, {
                 headers: {
                     'X-GitHub-Api-Version': '2022-11-28'
@@ -35,15 +39,18 @@ class GitHubRepoContentProvider implements vscode.TreeDataProvider<RepoItem> {
                     item.type === 'dir' ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
                     itemPath, // Assuming itemPath holds the full GitHub path to the item
                     item.type !== 'dir' ? {
-                        command: 'orion.viewGitHubFileContent', // This command will be triggered when a file item is clicked
-                        title: "View File",
-                        arguments: [item.download_url] // Pass the URL to fetch the file content as an argument
+                        command: 'orion.viewGitHubFileContent',
+                        title: "View Template",
+                        arguments: [{
+                            downloadUrl: item.download_url,
+                            type: 'githubFile'
+                        }]
                     } : undefined
                 );
             });
         } catch (error) {
-            console.error('Failed to load GitHub repository contents:', error);
-            vscode.window.showErrorMessage('Failed to load GitHub repository contents. See console for details.');
+            vscode.window.showErrorMessage('Failed to load tempplate contents. See console for details.');
+            
             return [];
         }
     }
@@ -57,7 +64,7 @@ class RepoItem extends vscode.TreeItem {
         public readonly command?: vscode.Command
     ) {
         super(label, collapsibleState);
-        this.tooltip = `${this.label}`;
+        this.tooltip = `View template`;
         this.resourceUri = vscode.Uri.parse(path);
     }
 }

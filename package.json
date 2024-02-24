@@ -1,6 +1,6 @@
 {
-  "name": "orionpackagemanager",
-  "displayName": "Orion - Project Manager",
+  "name": "orionoutpost",
+  "displayName": "Orion - Outpost",
   "description": "Manage Orion-based projects, packages and dependencies",
   "version": "0.8.0",
   "publisher": "supersocial",
@@ -25,10 +25,6 @@
         "category": "Orion"
       },
       {
-        "command": "orion.viewGitHubFileContent",
-        "title": "View GitHub File Content"
-      },
-      {
         "command": "orion.addGitHubToken",
         "title": "Add GitHub Token",
         "category": "Orion"
@@ -42,6 +38,15 @@
         "command": "orion.clearAllSecrets",
         "title": "Clear all secrets",
         "category": "Orion"
+      },
+      {
+        "command": "orion.searchPackages",
+        "title": "Search Available Packages",
+        "category": "Orion"
+      },
+      {
+        "command": "orion.viewGitHubFileContent",
+        "title": "View GitHub File Content"
       },
       {
         "command": "npmDependencies.installDependency",
@@ -68,6 +73,22 @@
         }
       },
       {
+        "command": "npmDependencies.installDependencyVersion",
+        "title": "Install",
+        "icon": {
+          "light": "resources/icons/light/add.svg",
+          "dark": "resources/icons/dark/add.svg"
+        }
+      },
+      {
+        "command": "npmDependencies.loadREADME",
+        "title": "Load Readme",
+        "icon": {
+          "light": "resources/icons/light/add.svg",
+          "dark": "resources/icons/dark/add.svg"
+        }
+      },
+      {
         "command": "npmDependencies.refresh",
         "title": "Refresh",
         "icon": {
@@ -84,11 +105,20 @@
         }
       },
       {
-        "command": "orionPackages.search",
-        "title": "Search",
+        "command": "orionTemplates.refresh",
+        "title": "Refresh",
         "icon": {
-          "light": "resources/icons/light/explorer.svg",
-          "dark": "resources/icons/dark/explorer.svg"
+          "light": "resources/icons/light/refresh.svg",
+          "dark": "resources/icons/dark/refresh.svg"
+        }
+      },
+      {
+        "command": "npmDependencies.syncWithPackageLock",
+        "title": "Sync with package-lock.json",
+        "category": "Orion",
+        "icon": {
+          "light": "resources/icons/light/sync.svg",
+          "dark": "resources/icons/dark/sync.svg"
         }
       }
     ],
@@ -97,16 +127,22 @@
         {
           "command": "npmDependencies.refresh",
           "when": "view == npmDependenciesView",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
+          "command": "npmDependencies.syncWithPackageLock",
+          "when": "view == npmDependenciesView",
+          "group": "navigation@0"
+        },
+        {
+          
           "command": "orionPackages.refresh",
           "when": "view == orionPackagesView",
           "group": "navigation"
         },
         {
-          "command": "orionPackages.search",
-          "when": "view == orionPackagesView",
+          "command": "orionTemplates.refresh",
+          "when": "view == orionTemplatesView",
           "group": "navigation"
         }
       ],
@@ -123,8 +159,13 @@
         },
         {
           "command": "npmDependencies.uninstallDependency",
-          "when": "view == npmDependenciesView",
+          "when": "view == npmDependenciesView && viewItem == installed_dependency",
           "group": "inline@1"
+        },
+        {
+          "command": "npmDependencies.installDependencyVersion",
+          "when": "view == npmDependenciesView && viewItem == version",
+          "group": "inline@0"
         }
       ]
     },
@@ -140,7 +181,7 @@
     "views": {
       "orion-explorer": [
         {
-          "id": "githubRepoView",
+          "id": "orionTemplatesView",
           "name": "Orion Templates",
           "icon": "resources/icons/light/explorer.svg"
         },
@@ -166,7 +207,7 @@
         "contents": "No packages available"
       },
       {
-        "view": "githubRepoView",
+        "view": "orionTemplatesView",
         "contents": "No templates available"
       }
     ]
@@ -185,6 +226,7 @@
     "test-compile": "tsc -p ./"
   },
   "devDependencies": {
+    "@types/fuzzy-search": "^2.1.5",
     "@types/mocha": "^10.0.6",
     "@types/node": "18.x",
     "@types/open": "^6.2.1",
@@ -199,11 +241,16 @@
   },
   "dependencies": {
     "@octokit/rest": "^20.0.2",
+    "@types/rimraf": "^4.0.5",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "axios": "^1.6.7",
     "child-process": "^1.0.2",
     "esbuild-plugin-copy": "^2.1.1",
+    "fuzzy-search": "^3.2.1",
+    "get-package-readme": "^1.4.0",
     "open": "^10.0.3",
+    "rimraf": "^5.0.5",
+    "simple-git": "^3.22.0",
     "weather-js": "^2.0.0"
   }
 }

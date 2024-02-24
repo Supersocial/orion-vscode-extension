@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { Credentials } from './credentials';
 import GitHubContentProvider from "./providers/GitHubContentProvider";
-import GitHubRepoContentProvider from './providers/GitHubRepoContentProvider';
+import OrionTemplateProvider from './providers/OrionTemplateProvider';
 import OrionPackagesProvider from './providers/OrionPackagesProvider';
 import NodeDependenciesProvider from './providers/NodeDependenciesProvider';
 import * as childProcess from 'child_process';
@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { initResources } from './icons';
+import FuzzySearch from 'fuzzy-search';
 const secretKeys = ['githubAccessToken'];
 
 /*
@@ -96,11 +97,19 @@ async function configureNpmrc(token: string): Promise<void> {
     });
 }
 
+
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
 	const credentials = new Credentials();
 	await credentials.initialize(context);
+
+	if (!vscode.workspace.workspaceFolders && !vscode.workspace.workspaceFile) {
+		vscode.window.showWarningMessage('Orion requires an open workspace to function');
+		
+		return;
+	}
 
 	initResources(context);
 
@@ -113,7 +122,10 @@ export async function activate(context: vscode.ExtensionContext) {
 	const githubContentProvider = new GitHubContentProvider();
 
 	const installedPackagesProvider = new NodeDependenciesProvider(workspaceRoot, octokit);	
-	const githubRepoContentProvider = new GitHubRepoContentProvider(octokit);
+	const orionTemplateProvider = new OrionTemplateProvider(octokit);
+
+	vscode.window.registerTreeDataProvider('orionTemplatesView', orionTemplateProvider);
+	context.subscriptions.push(vscode.commands.registerCommand('orionTemplates.refresh', () => orionTemplateProvider.refresh()));
 
 	// orion
     vscode.window.registerTreeDataProvider('orionPackagesView', orionPackagesProvider);
@@ -144,7 +156,7 @@ export async function activate(context: vscode.ExtensionContext) {
 		runNpmCommand(`npm install @supersocial/${packageName}`, workspaceRoot).then((result) => {
 			orionPackagesProvider.refresh();
 			npmDependenciesProvider.refresh();
-			vscode.window.showInformationMessage(`Installed ${packageName}`);
+			vscode.window.showInformationMessage(`Installed!`);
 		}).catch((error) => {
 			vscode.window.showErrorMessage(`Failed to install ${packageName}: ${error}`);
 		});
@@ -160,29 +172,103 @@ export async function activate(context: vscode.ExtensionContext) {
 		runNpmCommand(`npm uninstall @supersocial/${packageName}`, workspaceRoot).then((result) => {
 			npmDependenciesProvider.refresh();
 			orionPackagesProvider.refresh();
-			vscode.window.showInformationMessage(`Uninstalled ${packageName}`);
+			vscode.window.showInformationMessage(`Uninstalled!`);
 		}).catch((error) => {
 			vscode.window.showErrorMessage(`Failed to uninstall ${packageName}: ${error}`);
 		});
     });
 
+	vscode.commands.registerCommand('npmDependencies.installDependencyVersion', (node) => {
+		const packageName = node.packageName;
+		const packageVersion = node.name;
+
+		// feedback
+		vscode.window.showInformationMessage(`Installing ${packageName}@${packageVersion}`);
+
+		// run the command
+		runNpmCommand(`npm install @supersocial/${packageName}@${packageVersion}`, workspaceRoot).then((result) => {
+			npmDependenciesProvider.refresh();
+			orionPackagesProvider.refresh();
+			vscode.window.showInformationMessage(`Installed!`);
+		}).catch((error) => {
+			vscode.window.showErrorMessage(`Failed to install ${packageName}@${packageVersion}: ${error}`);
+		});
+	});
+
+	vscode.commands.registerCommand('npmDependencies.syncWithPackageLock', () => {
+		// feedback
+		vscode.window.showInformationMessage('Syncing node_modules with package-lock.json...');
+
+		runNpmCommand('npm clean-install', workspaceRoot).then((result) => {
+			npmDependenciesProvider.refresh();
+			orionPackagesProvider.refresh();
+			vscode.window.showInformationMessage('Synced with package-lock.json');
+		}).catch((error) => {
+			vscode.window.showErrorMessage(`Failed to sync with package-lock.json: ${error}`);
+		});
+	});
+
+	// vscode.commands.registerCommand('npmDependencies.loadREADME', async (downloadUrl) => {
+	// 	const packageName = node.packageName;
+	// 	const packagePath = `src/${packageName}/README.md`;
+
+	// 	const uri = vscode.Uri.from({
+	// 		scheme: 'github',
+	// 		path: 'README.md',
+	// 		query: encodeURIComponent(packagePath)
+	// 	});
+
+	// 	const doc = await vscode.workspace.openTextDocument(uri)
+	// 	await vscode.window.showTextDocument(doc, { preview: true });
+	// });
+
 	// github file viewing
 	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('github', githubContentProvider));
-	context.subscriptions.push(vscode.commands.registerCommand('orion.viewGitHubFileContent', async (downloadUrl) => {
-		// Parse the URL to get the pathname, then extract the filename
-		const parsedUrl = new URL(downloadUrl);
-		const pathname = parsedUrl.pathname;
-		const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
-	
-		// Use the filename in the URI for the virtual document
-		const uri = vscode.Uri.from({
-			scheme: 'github',
-			path: filename,
-			query: encodeURIComponent(downloadUrl)
-		});
+	context.subscriptions.push(vscode.commands.registerCommand('orion.viewGitHubFileContent', async (info) => {
 
-		const doc = await vscode.workspace.openTextDocument(uri); // Request VS Code to open the virtual document
-		await vscode.window.showTextDocument(doc, { preview: true });
+		if (info.type === 'githubFile') {
+			const downloadUrl = info.downloadUrl;
+
+			// Parse the URL to get the pathname, then extract the filename
+			const parsedUrl = new URL(downloadUrl);
+			const pathname = parsedUrl.pathname;
+			const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
+
+			// Use the filename in the URI for the virtual document
+			const uri = vscode.Uri.from({
+				scheme: 'github',
+				path: filename,
+				query: encodeURIComponent(downloadUrl)
+			});
+
+			const doc = await vscode.workspace.openTextDocument(uri)
+			await vscode.window.showTextDocument(doc, { preview: true });
+		} else if (info.type === 'fileByName') {
+			const filePath = info.filePath;
+
+			console.log('fetching file', filePath);
+
+			// fetch the readme
+			const response = await octokit.request(filePath, {
+				headers: {
+					'X-GitHub-Api-Version': '2022-11-28'
+				}
+			});
+
+			const downloadUrl = response.data.download_url;
+
+			// Parse the URL to get the pathname, then extract the filename
+			const uri = vscode.Uri.from({
+				scheme: 'github',
+				path: filePath,
+				query: encodeURIComponent(downloadUrl)
+			});
+
+			const doc = await vscode.workspace.openTextDocument(uri);
+			await vscode.window.showTextDocument(doc, {
+				preview: true,
+			});
+		}
 	}));	
 
 	// github token / NPM
@@ -209,6 +295,24 @@ export async function activate(context: vscode.ExtensionContext) {
 				vscode.window.showErrorMessage(`Failed to authenticate NPM ${error}`);
 			});
 		});
+	}));
+
+	// search for orion packages
+	context.subscriptions.push(vscode.commands.registerCommand('orion.searchPackages', async () => {
+		// fetch packages\
+		const result = await vscode.window.showQuickPick(orionPackagesProvider.getPackages().then((packages) => {
+			return packages
+				.map((packageInfo: any) => packageInfo.name)
+				.sort((a: any, b: any) => a.localeCompare(b));
+		}), {
+			placeHolder: 'Search for a package',
+		});
+
+		// if the user selected a package
+		if (result) {
+			// open the package
+			vscode.commands.executeCommand('npmDependencies.installDependency', {label: result});
+		}
 	}));
 
 	// warn if no token

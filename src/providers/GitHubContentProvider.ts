@@ -7,7 +7,6 @@ class GitHubContentProvider implements vscode.TextDocumentContentProvider {
 
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
         const downloadUrl = decodeURIComponent(decodeURIComponent(uri.query));
-        console.log(downloadUrl);
 
         try {
             const response = await axios.get(downloadUrl, {
@@ -15,6 +14,7 @@ class GitHubContentProvider implements vscode.TextDocumentContentProvider {
             });
             return response.data; // Return the file content as a string
         } catch (error) {
+            console.log(downloadUrl);
             console.error(`Failed to fetch file from GitHub: ${error}`);
             vscode.window.showErrorMessage('Failed to load the file from GitHub.');
             return ''; // Return an empty string or some error message to display in the document
